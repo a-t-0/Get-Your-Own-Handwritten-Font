@@ -1,4 +1,5 @@
 \documentclass{article}
+%\usepackage{showframe,geometry}
 \usepackage{geometry}
  \geometry{
  a4paper,
@@ -31,8 +32,8 @@
 % boxHeight = 2.2
 % nrOfBoxesPerLine = 10
 % nrOfBoxesPerLineMinOne = 9
-% nrOfLinesPerPage = 6
-% nrOfLinesPerPageMinOne = 5
+% nrOfLinesInTemplate = 6
+% nrOfLinesInTemplateMinOne = 5
 % \end{filecontents*}
 
 % \begin{filecontents*}{symbols.txt}
@@ -51,12 +52,27 @@
 
 % Enable latex to loop through variables
 \usepackage{forloop}
-
+	
 % TODO: Change encoding to adapt to different languages based on what read_symbol_specs contains
 \usepackage[utf8x]{inputenc}
 
 \newcommand\customfont[1]{{\usefont{T1}{custom}{m}{n} #1 }}
 
+\newcounter{counterA}
+\newcounter{counterB}
+\setcounter{counterA}{0}
+
+\newcounter{fixedAtZero}
+\setcounter{fixedAtZero}{0}
+% testcommand
+\newcommand\maccommand{%
+    \ifnum\the\value{counterA}=\the\value{counterB}
+        %Just so you know, counterA (= \the\value{counterA}) holds the same value as counterB (= \the\value{counterB}).%
+        \setcounter{counterA}{0}
+        \newpage
+    \else 
+        %Sorry, but the counterA (= \the\value{counterA}) is not equal to counterB (= \the\value{counterB}).%
+    \fi}
 
 \begin{document}
 \input{sheets}
