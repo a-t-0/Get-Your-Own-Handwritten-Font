@@ -2,6 +2,7 @@ from PIL import Image
 import operator
 from collections import deque
 from io import StringIO
+import os
 
 def add_tuple(a, b):
     return tuple(map(operator.add, a, b))
@@ -178,16 +179,35 @@ def rgba_image_to_svg_pixels(im, opaque=None):
             rgba = im.getpixel(here)
             if opaque and not rgba[3]:
                 continue
-            s.write("""  <rect x="%d" y="%d" width="1" height="1" style="fill:rgb%s; fill-opacity:%.3f; stroke:none;" />\n""" % (x, y, rgba[0:3], float(rgba[2]) / 255))
+            #s.write("""  <rect x="%d" y="%d" width="1" height="1" style="fill:rgb%s; fill-opacity:%.3f; stroke:none;" />\n""" % (x, y, rgba[0:3], float(rgba[2]) / 255))
+            s.write("""  <rect x="%d" y="%d" width="1" height="1" style="fill:black; fill-opacity:%.3f; stroke:none;" />\n""" % (x, y, rgba[3], float(rgba[2]) / 255))
     s.write("""</svg>\n""")
     return s.getvalue()
 
-def main():
-    image = Image.open('examples/angular.png').convert('RGBA')
+def convert_png_to_svg(filepath):
+    image = Image.open(filepath).convert('RGBA')
     svg_image = rgba_image_to_svg_contiguous(image)
     #svg_image = rgba_image_to_svg_pixels(image)
-    with open("examples/angular.svg", "w") as text_file:
+    with open(f'{filepath[:-4]}.svg', "w") as text_file:
         text_file.write(svg_image)
+        print(f'Created svg file:{filepath[:-4]}.svg')
+        
+        
+# walks through png files and calls function to convert the png file to .svg
+def walk_through_png_files(folder):
+        for root, dirs, files in os.walk(folder):
+            for file in files:
+                filepath = os.path.join(root, file)
+                #if filepath[-4:]==".png":
+                if filepath[-5:]=="0.png":
+                    convert_png_to_svg(os.path.join(root, file))
+
+def main():
+    'examples/angular.png'
+    # loop through files in font_in folder and convert them to .svg files
+    walk_through_png_files('../../template_reading/font_in/')
+
+    
 
 if __name__ == '__main__':
     main()

@@ -962,19 +962,73 @@ class ReadTemplate:
     def get_symbol_coords_of_qr_code(self,row_nr, column_index,geometry_data):
         return top,left,right,bottom    
         
+    def create_json(self):
+        
+        # Doesn't work, creates a black square
+def replace_string_in_file(self,template,output_filepath,insertion_string):
+    # Read in the file
+    with open(filepath, 'r') as file :
+      filedata = file.read()
+
+    # Replace the target string
+    filedata = filedata.replace(', "glyphs":{}', f', "glyphs":\n{{insertion_string}}\n')
+
+    # Write the file out again
+    with open(filepath, 'w') as file:
+      file.write(filedata)
+        
+"0x3f": { "src": "question.svg", "width": 128 }
+, "0xab": { "src": "back.svg", "width": 128 }
+, "0x61": { "src": "1.svg", "width": 128 }
+, "0x63": { "src": "0.svg", "width": 128 }
+, "0x263a": ""
+, "0x1f304": "outline-test.svg"
         
         
+    # removes noise from the image
+    # source: https://stackoverflow.com/questions/59863948/clean-text-images-with-opencv-for-ocr-reading
+    def image_postprocessing(self,path_to_image):
+        # attempt 1
+        img = cv2.imread(path_to_image, 0) 
+        ret,thresh = cv2.threshold(img,55,255,cv2.THRESH_BINARY)
+        opening = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_RECT,(2,2)))
+        cv2.imwrite('result_1.jpg', opening)
         
+        # attempt 2
+        Mat im = imread(path_to_image,0);
+        medianBlur(im, im, 3);
+        threshold(im, im, 70, 255, THRESH_BINARY_INV);
+        imshow("1", im);
+        waitKey(0);
         
+        # attempt 3 Removes blobs below certain size C++ implementation
         
-        
-        
-        
-        
-        
+        # //Area threshold:
+        # int minArea = 10; //10 px
+        # cv::Mat outputLabels, stats, img_color, centroids;
+        # int numberofComponents = cv::connectedComponentsWithStats(bwImage, outputLabels, 
+        # stats, centroids, connectivity);
+        # std::vector<cv::Vec3b> colors(numberofComponents+1);
+        # colors[i] = cv::Vec3b(rand()%256, rand()%256, rand()%256);
+        do not count the original background-> label = 0:
+        # colors[0] = cv::Vec3b(0,0,0);
+        # for( int i = 1; i <= numberofComponents; i++ ) {
+
+            get the area of the current blob:
+            # auto blobArea = stats.at<int>(i-1, cv::CC_STAT_AREA);
+
+            apply the area filter:
+            # if ( blobArea < minArea )
+            # {
+                filter blob below minimum area:
+                small regions are painted with (ridiculous) pink color
+                # colors[i-1] = cv::Vec3b(248,48,213);
+            # }
+        # }
         
     
 # executes this main code
 if __name__ == '__main__':
     main = ReadTemplate()
-    main.perform_runs()
+    
+    #main.perform_runs()
