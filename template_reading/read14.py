@@ -8,7 +8,7 @@
 # conda install numpy
 
 # pip install pdf2image
-#conda install -c conda-forge poppler
+# conda install -c conda-forge poppler
 import os, re, os.path
 from os import listdir
 from os.path import isfile, join
