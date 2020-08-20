@@ -28,6 +28,12 @@ import matplotlib.pyplot as plt
 from statistics import mean
 
 
+# this class is used to perform 3 runs on the images in folder `in`.
+# The first run tries to instantly find all the qr codes on a single page, it is fast but finds few qr codes.
+# The 2nd run first finds all relevant contours in a page, then filters the contours on aspect ratio, since it finds
+# contours that include the stacked 3 boxes of: qrcode, handwritten symbol and symbol in one. These with aspect ratio of
+# aproximately 1:3 are processed to take the qr code and symbol from the contour. It is slow and effective
+# The third run simply analyses all contours regardless of aspect ratio. 
 class ReadTemplate:
     
     # intializes object
@@ -660,14 +666,16 @@ class ReadTemplate:
                         
                         if not nearest_row_with_spacing is None:
                             geometry_data = self.get_geometry_data(nearest_row_with_spacing,page_nr_of_img,qrcodes)
-                            
-                            updated_geometry_data = self.update_geometry(geometry_data,row_nr,nearest_row_with_spacing,qrcodes)
-                            
-                            qrcodes_of_nearest_row = self.get_found_qrcodes_in_row(nearest_row_with_spacing,qrcodes)
-                            
-                            missing_qr_codes_indices_in_nearest_row = self.identify_unknown_qrcodes_in_row(nearest_row_with_spacing,qrcodes)
-                            
-                            self.extract_missing_symbols_in_empty_line(img_name,row_nr,geometry_data,missing_qr_codes_indices_in_nearest_row,qrcodes,updated_geometry_data,qrcodes_of_nearest_row,nearest_row_with_spacing)
+                            if geometry_data == False:
+                                print(f'Could not find enough qr codes in environment for geometric inference. TODO: Adapt this error message')
+                            else:
+                                updated_geometry_data = self.update_geometry(img_name,geometry_data,row_nr,nearest_row_with_spacing,qrcodes)
+                                
+                                qrcodes_of_nearest_row = self.get_found_qrcodes_in_row(nearest_row_with_spacing,qrcodes)
+                                
+                                missing_qr_codes_indices_in_nearest_row = self.identify_unknown_qrcodes_in_row(nearest_row_with_spacing,qrcodes)
+                                
+                                self.extract_missing_symbols_in_empty_line(img_name,row_nr,geometry_data,missing_qr_codes_indices_in_nearest_row,qrcodes,updated_geometry_data,qrcodes_of_nearest_row,nearest_row_with_spacing)
                 else:
                     return print(f'NEED MORE IMAGES CANT DO GEOMETRIC INFERENCE in this run TODO: Specify which run.')
     
@@ -746,12 +754,13 @@ class ReadTemplate:
     # returns the geometry data from the nearest row that has the quarter distance fraction
     # with the top and bottom shifted to the qr in the row that is being geometrically inferenced.
     # (because that row didn't have the quarter distance fraction/enough geometry data)
-    def update_geometry(self,geometry_data,original_row,nearest_row,qrcodes):
+    def update_geometry(self,img_name,geometry_data,original_row,nearest_row,qrcodes):
         updated_geometry_data = geometry_data.copy()
         original_row_qr_codes =  self.get_found_qrcodes_in_row(original_row,qrcodes)
         if len(original_row_qr_codes)==0:
             reference_row = self.get_reference_row(nearest_row,qrcodes)
-            updated_geometry_data[3],updated_geometry_data[4] = self.get_interpolate_top_and_bottom(original_row,nearest_row,reference_row,qrcodes)
+            if reference_row is not None:
+                updated_geometry_data[3],updated_geometry_data[4] = self.get_interpolate_top_and_bottom(img_name,original_row,nearest_row,reference_row,qrcodes)
         else:
             updated_geometry_data[3] = round(mean(list(map(lambda x: x.top,original_row_qr_codes))),0) #3
             updated_geometry_data[4] = round(mean(list(map(lambda x: x.bottom,original_row_qr_codes))),0) #3
@@ -763,7 +772,7 @@ class ReadTemplate:
     # reference row is a row that contains at least 1 detected qr code, whilst not being the original row nor nearest row.
     # This method uses the top positions of the original and nearest row to inter/extrapolate the position of the original row
     # and returns this position (in pixels wrt the top of the original image).
-    def get_interpolate_top_and_bottom(self,original_row,nearest_row,reference_row,qrcodes):
+    def get_interpolate_top_and_bottom(self,img_name, original_row,nearest_row,reference_row,qrcodes):
         # verify input data is valid for interpolation
         self.check_interpolation_options(original_row,nearest_row,reference_row)
         print(f'original_row={original_row},nearest_row={nearest_row},reference_row={reference_row}')
@@ -771,27 +780,37 @@ class ReadTemplate:
         qrcodes_nearest_row = self.get_found_qrcodes_in_row(nearest_row,qrcodes)
         qrcodes_reference_row = self.get_found_qrcodes_in_row(reference_row,qrcodes)
         
-        # compute the avg top position of the qr code of the nearest and reference rows
-        top_nearest_row = round(mean(list(map(lambda x: x.top,qrcodes_nearest_row))),0) # a _pixels
-        top_reference_row = round(mean(list(map(lambda x: x.top,qrcodes_reference_row))),0) # c_pixels
-        
-        # compute the avg bottom position of the qr code of the nearest and reference rows
-        bottom_nearest_row = round(mean(list(map(lambda x: x.bottom,qrcodes_nearest_row))),0) # a _pixels
-        bottom_reference_row = round(mean(list(map(lambda x: x.bottom,qrcodes_reference_row))),0) # c_pixels
-        
-        # Compute the measured distance between the top of the nearest and reference row
-        top_ref_min_nearest = top_nearest_row-top_reference_row #c-a _pixels
-        bottom_ref_min_nearest = bottom_nearest_row-bottom_reference_row #c-a _pixels
-        
-        # Interpolate the difference between the top of the nearest row and original row (in pixels)
-        # a is nearest row
-        # b = original row
-        # c = reference row
-        #a_pixels+(c-a)_pixels*(b-a)_boxes/(c-a)_boxes
-        top_original = top_nearest_row+(top_reference_row-top_nearest_row)*(original_row-nearest_row)/(reference_row-nearest_row)
-        bottom_original = bottom_nearest_row+(bottom_reference_row-bottom_nearest_row)*(original_row-nearest_row)/(reference_row-nearest_row)
-        
-        return top_original,bottom_original
+        # check if enough relative qr codes are found
+        if self.check_nr_of_qrcodes(img_name,qrcodes_nearest_row,"nearest row"):
+            if self.check_nr_of_qrcodes(img_name,qrcodes_reference_row,"reference row"):
+                # compute the avg top position of the qr code of the nearest and reference rows
+                top_nearest_row = round(mean(list(map(lambda x: x.top,qrcodes_nearest_row))),0) # a _pixels
+                top_reference_row = round(mean(list(map(lambda x: x.top,qrcodes_reference_row))),0) # c_pixels
+                
+                # compute the avg bottom position of the qr code of the nearest and reference rows
+                bottom_nearest_row = round(mean(list(map(lambda x: x.bottom,qrcodes_nearest_row))),0) # a _pixels
+                bottom_reference_row = round(mean(list(map(lambda x: x.bottom,qrcodes_reference_row))),0) # c_pixels
+                
+                # Compute the measured distance between the top of the nearest and reference row
+                top_ref_min_nearest = top_nearest_row-top_reference_row #c-a _pixels
+                bottom_ref_min_nearest = bottom_nearest_row-bottom_reference_row #c-a _pixels
+                
+                # Interpolate the difference between the top of the nearest row and original row (in pixels)
+                # a is nearest row
+                # b = original row
+                # c = reference row
+                #a_pixels+(c-a)_pixels*(b-a)_boxes/(c-a)_boxes
+                top_original = top_nearest_row+(top_reference_row-top_nearest_row)*(original_row-nearest_row)/(reference_row-nearest_row)
+                bottom_original = bottom_nearest_row+(bottom_reference_row-bottom_nearest_row)*(original_row-nearest_row)/(reference_row-nearest_row)
+                
+                return top_original,bottom_original
+    
+    # Verifies there are enough images in the other rows for geometric inference
+    def check_nr_of_qrcodes(self,img_name,qrcodes,row_name):
+        if len(qrcodes) == 0:
+            raise ValueError(f'There are not enough qr codes found in:{row_name}, of image={img_name}')
+        elif len(qrcodes)> 0:
+            return True
         
     # checks if interpolation is possible with incoming data. Throws errors if interpolation is not possible.    
     def check_interpolation_options(self,original_row,nearest_row,reference_row):
@@ -802,33 +821,48 @@ class ReadTemplate:
         if reference_row == nearest_row:
             raise ValueError('the nearest row and reference row should be different for them to be usable in interpolation, but they are not.')
 
+    # returns the reference row that is furthest away
+    # returns 0 if no reference row is found that contains a qr code
     def get_reference_row(self,nearest_row,qrcodes):
         start_row = 1
         end_row = qrcodes[0].nrOfLinesInPage
         
         max_distance = 0
         max_distance_row = None
+        next_row_nr = None
         for distance in range(start_row,end_row):
             for x in [-1,1]:
-                next_row_nr = nearest_row+distance*x
-                if (next_row_nr  <= end_row) and (next_row_nr >= start_row):
-                    if distance>max_distance:
-                        max_distance = distance
-                        max_distance_row = next_row_nr
+                if self.row_has_qrcodes(nearest_row+distance*x,qrcodes):
+                    next_row_nr = nearest_row+distance*x
+                
+                if next_row_nr is not None:
+                    if (next_row_nr  <= end_row) and (next_row_nr >= start_row):
+                        if distance>max_distance:
+                            max_distance = distance
+                            max_distance_row = next_row_nr
         return next_row_nr
+
+    # returns true if a row contains qr codes
+    # returns false if a row contains no qrcodes
+    def row_has_qrcodes(self,row_nr,qrcodes):
+        for i in range(0,len(qrcodes)):
+            if qrcodes[i].row == row_nr:
+                return True
+        return False
                         
     # computes the geometry of qrcodes in a specific row on a specific page and returns it as list
+    # returns false if not enough qr codes are found
     def get_geometry_data(self,row_nr,page_nr_of_img,qrcodes):
         qrcodes_in_row = self.get_found_qrcodes_in_row(row_nr,qrcodes) #0 
-        
-        avg_width_in_row = round(mean(list(map(lambda x: x.width,qrcodes_in_row))),0) #1
-        avg_height_in_row = round(mean(list(map(lambda x: x.height,qrcodes_in_row))),0) #2
-        avg_top_in_row = round(mean(list(map(lambda x: x.top,qrcodes_in_row))),0) #3
-        avg_bottom_in_row = round(mean(list(map(lambda x: x.bottom,qrcodes_in_row))),0) #4
-        avg_qrcode_spacing_in_row = self.get_avg_spacing_between_qrcodes(row_nr,qrcodes_in_row,page_nr_of_img,avg_width_in_row) #5
-        
-        return [qrcodes_in_row,avg_width_in_row,avg_height_in_row,avg_top_in_row,avg_bottom_in_row,avg_qrcode_spacing_in_row]
-    
+        if len(qrcodes_in_row)>0:
+            avg_width_in_row = round(mean(list(map(lambda x: x.width,qrcodes_in_row))),0) #1
+            avg_height_in_row = round(mean(list(map(lambda x: x.height,qrcodes_in_row))),0) #2
+            avg_top_in_row = round(mean(list(map(lambda x: x.top,qrcodes_in_row))),0) #3
+            avg_bottom_in_row = round(mean(list(map(lambda x: x.bottom,qrcodes_in_row))),0) #4
+            avg_qrcode_spacing_in_row = self.get_avg_spacing_between_qrcodes(row_nr,qrcodes_in_row,page_nr_of_img,avg_width_in_row) #5
+            
+            return [qrcodes_in_row,avg_width_in_row,avg_height_in_row,avg_top_in_row,avg_bottom_in_row,avg_qrcode_spacing_in_row]
+        return False
     
     def extract_missing_symbols_in_line(self,img_name,row_nr,geometry_data,missing_qrcodes_indices_in_row,detected_qrcodes):
         found_qrcodes_in_row = geometry_data[0]
@@ -963,26 +997,27 @@ class ReadTemplate:
         return top,left,right,bottom    
         
     def create_json(self):
+        pass
         
-        # Doesn't work, creates a black square
-def replace_string_in_file(self,template,output_filepath,insertion_string):
-    # Read in the file
-    with open(filepath, 'r') as file :
-      filedata = file.read()
+    # Doesn't work, creates a black square
+    def replace_string_in_file(self,template,output_filepath,insertion_string):
+        # Read in the file
+        with open(filepath, 'r') as file :
+          filedata = file.read()
 
-    # Replace the target string
-    filedata = filedata.replace(', "glyphs":{}', f', "glyphs":\n{{insertion_string}}\n')
+        # Replace the target string
+        filedata = filedata.replace(', "glyphs":{}', f', "glyphs":\n{{insertion_string}}\n')
 
-    # Write the file out again
-    with open(filepath, 'w') as file:
-      file.write(filedata)
+        # Write the file out again
+        with open(filepath, 'w') as file:
+          file.write(filedata)
         
-"0x3f": { "src": "question.svg", "width": 128 }
-, "0xab": { "src": "back.svg", "width": 128 }
-, "0x61": { "src": "1.svg", "width": 128 }
-, "0x63": { "src": "0.svg", "width": 128 }
-, "0x263a": ""
-, "0x1f304": "outline-test.svg"
+# "0x3f": { "src": "question.svg", "width": 128 }
+# , "0xab": { "src": "back.svg", "width": 128 }
+# , "0x61": { "src": "1.svg", "width": 128 }
+# , "0x63": { "src": "0.svg", "width": 128 }
+# , "0x263a": ""
+# , "0x1f304": "outline-test.svg"
         
         
     # removes noise from the image
@@ -995,7 +1030,7 @@ def replace_string_in_file(self,template,output_filepath,insertion_string):
         cv2.imwrite('result_1.jpg', opening)
         
         # attempt 2
-        Mat im = imread(path_to_image,0);
+        im = imread(path_to_image,0);
         medianBlur(im, im, 3);
         threshold(im, im, 70, 255, THRESH_BINARY_INV);
         imshow("1", im);
@@ -1010,25 +1045,44 @@ def replace_string_in_file(self,template,output_filepath,insertion_string):
         # stats, centroids, connectivity);
         # std::vector<cv::Vec3b> colors(numberofComponents+1);
         # colors[i] = cv::Vec3b(rand()%256, rand()%256, rand()%256);
-        do not count the original background-> label = 0:
+        
+        # do not count the original background-> label = 0:
         # colors[0] = cv::Vec3b(0,0,0);
         # for( int i = 1; i <= numberofComponents; i++ ) {
 
-            get the area of the current blob:
+            # get the area of the current blob:
             # auto blobArea = stats.at<int>(i-1, cv::CC_STAT_AREA);
 
-            apply the area filter:
+            # apply the area filter:
             # if ( blobArea < minArea )
             # {
-                filter blob below minimum area:
-                small regions are painted with (ridiculous) pink color
+                # filter blob below minimum area:
+                # small regions are painted with (ridiculous) pink color
                 # colors[i-1] = cv::Vec3b(248,48,213);
             # }
         # }
-        
+
+    # source: https://stackoverflow.com/questions/34617422/how-to-optimize-image-size-using-wand-in-python
+    def reduce_image_filesize(self,):
+        # Require wand's API library and basic ctypes
+        from wand.api import library
+        from ctypes import c_void_p, c_size_t
+
+        # Tell Python's wand library about the MagickWand Compression Quality (not Image's Compression Quality)
+        library.MagickSetCompressionQuality.argtypes = [c_void_p, c_size_t]
+
+        # Do work as before
+        from wand.image import Image
+
+        with Image(filename=filename) as img:
+            img.resize(width=scaled_width, height=scaled_hight)
+            # Set the optimization level through the linked resources of 
+            # the image instance. (i.e. `wand.image.Image.wand`)
+            library.MagickSetCompressionQuality(img.wand, 75)
+            img.save(filename=output_destination)
     
 # executes this main code
 if __name__ == '__main__':
     main = ReadTemplate()
     
-    #main.perform_runs()
+    main.perform_runs()
