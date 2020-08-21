@@ -7,6 +7,19 @@ import fileinput
 from PIL import Image
 import cv2
 
+# walks through png files and calls function to convert the png file to .svg
+class ConvertSvgToGrayscale():
+    def __init__(self,folder):
+        print(folder)
+        for root, dirs, files in os.walk(folder):
+            for file in files:
+                filepath = os.path.join(root, file)
+                if filepath=="example.svg":
+                    print(f'ound file')
+                    #convert_svg_to_grayscale_inkscape(os.path.join(root, file))
+                    #convert_svg_to_grayscale(os.path.join(root, file))
+                    grayscale(os.path.join(root, file))
+
 # Doesn't work, creates a black square
 def convert_svg_to_grayscale(filepath):
     # Read in the file
@@ -29,20 +42,7 @@ def convert_svg_to_grayscale_inkscape(filepath):
 def grayscale(filepath):
     image = Image.open(filepath)
     cv2.imwrite(f'{filepath}', image.convert('L'))
-
-
-# walks through png files and calls function to convert the png file to .svg
-def main(folder):
-    print(folder)
-    for root, dirs, files in os.walk(folder):
-        for file in files:
-            filepath = os.path.join(root, file)
-            if filepath=="example.svg":
-                print(f'ound file')
-                #convert_svg_to_grayscale_inkscape(os.path.join(root, file))
-                #convert_svg_to_grayscale(os.path.join(root, file))
-                grayscale(os.path.join(root, file))
-                
-
+    
+    
 if __name__ == '__main__':
-    main('../template_reading/font_in/')
+    main = ConvertSvgToGrayscale('../template_reading/font_in/')

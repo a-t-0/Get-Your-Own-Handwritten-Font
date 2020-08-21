@@ -4,6 +4,12 @@ from collections import deque
 from io import StringIO
 import os
 
+class ConvertPngToSvg():
+    def __init__(self):
+        'examples/angular.png'
+        # loop through files in font_in folder and convert them to .svg files
+        walk_through_png_files('../../template_reading/font_in/')
+
 def add_tuple(a, b):
     return tuple(map(operator.add, a, b))
 
@@ -195,19 +201,16 @@ def convert_png_to_svg(filepath):
         
 # walks through png files and calls function to convert the png file to .svg
 def walk_through_png_files(folder):
-        for root, dirs, files in os.walk(folder):
-            for file in files:
-                filepath = os.path.join(root, file)
-                #if filepath[-4:]==".png":
-                if filepath[-5:]=="0.png":
-                    convert_png_to_svg(os.path.join(root, file))
-
-def main():
-    'examples/angular.png'
-    # loop through files in font_in folder and convert them to .svg files
-    walk_through_png_files('../../template_reading/font_in/')
-
-    
+    for root, dirs, files in os.walk(folder):
+        for file in files:
+            filepath = os.path.join(root, file)
+            #if filepath[-4:]==".png":
+            #if filepath[-5:]=="0.png":
+            #   convert_png_to_svg(os.path.join(root, file))
+            if filepath[-5:]=="1.jpg":
+                print(f' converting')
+                convert_png_to_svg(os.path.join(root, file))
+                print(f' done converting')
 
 if __name__ == '__main__':
-    main()
+    main = ConvertPngToSvg()

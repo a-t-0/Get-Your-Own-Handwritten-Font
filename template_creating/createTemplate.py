@@ -3,14 +3,17 @@ import math
 class CreateTemplate:
     
     # intializes object
-    def __init__(self):
+    def __init__(self, relative_path=""):
+        
+        self.relative_path = relative_path
         
         self.encoding = "utf-8" # encoding used to handle symbol encoding
         # TODO: export encoding to import it with latex.
         # TODO: automatically select encoding based on user chosen language.
         
         # Specify inout and output file locations and names
-        source_dir = "./"
+        source_dir = "./"+self.relative_path
+        print(f'source_dir={source_dir}')
         ext = ".txt"
         self.symbols_file_name = "symbols"
         self.page_setting_filename = 'symbol_spec'

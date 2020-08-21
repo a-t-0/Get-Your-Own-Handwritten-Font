@@ -29,8 +29,11 @@ The following libraries are used in the python and can directly be installed wit
 conda install -c conda-forge inkscape
 conda install numpy
 conda install -c conda-forge poppler
+conda install -c conda-forge fonttools
 pip install pdf2image
 pip install scour
+pip install pyunpack
+pip install patool
 ```
 
 The following packages require a bit more effort:

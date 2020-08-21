@@ -20,12 +20,24 @@ from pdf2image import convert_from_path
 from pyzbar.pyzbar import decode
 from PIL import Image
 
-from QrCode import QrCode
 
+import sys
+
+
+# perform a relative import if the code is not executed directly but from main from parent dir
+try:
+    # when executed directly
+    from QrCode import QrCode
+except ImportError:
+    # When executed from parent class
+    from .QrCode import QrCode
+    
 import scipy.signal
 import numpy as np
 import matplotlib.pyplot as plt
 from statistics import mean
+
+
 
 
 # this class is used to perform 3 runs on the images in folder `in`.
@@ -1020,6 +1032,13 @@ class ReadTemplate:
 # , "0x1f304": "outline-test.svg"
         
         
+    def convert_png_to_jpg(self,filename):
+        im = Image.open(filename)
+        rgb_im = im.convert('RGB')
+        out = f'{filename[:-4]}.jpg'
+        print(f'out={out}')
+        rgb_im.save(out)
+        
     # removes noise from the image
     # source: https://stackoverflow.com/questions/59863948/clean-text-images-with-opencv-for-ocr-reading
     def image_postprocessing(self,path_to_image):
@@ -1063,26 +1082,139 @@ class ReadTemplate:
         # }
 
     # source: https://stackoverflow.com/questions/34617422/how-to-optimize-image-size-using-wand-in-python
-    def reduce_image_filesize(self,):
+    # method avoided as it requires manual installation of magic wand (the pip install is not recognized).
+    def reduce_image_filesize(self,filename,output_destination):
+
+        # for image optimisation (size reduction)
         # Require wand's API library and basic ctypes
+        # pip install wand
         from wand.api import library
         from ctypes import c_void_p, c_size_t
+        from wand.image import wandImage        
 
         # Tell Python's wand library about the MagickWand Compression Quality (not Image's Compression Quality)
         library.MagickSetCompressionQuality.argtypes = [c_void_p, c_size_t]
-
-        # Do work as before
-        from wand.image import Image
-
-        with Image(filename=filename) as img:
+        
+        with wandImage(filename=filename) as img:
             img.resize(width=scaled_width, height=scaled_hight)
             # Set the optimization level through the linked resources of 
             # the image instance. (i.e. `wand.image.Image.wand`)
             library.MagickSetCompressionQuality(img.wand, 75)
             img.save(filename=output_destination)
     
+    def compress_image_V2(self,filename,output_destination):
+        from PIL import Image, ImageDraw, ImageFont
+        import os
+        im = Image.open(filename)
+        im.save(output_destination,optimize=True,quality=99) 
+
+    # Source: https://towardsdatascience.com/image-compression-using-k-means-clustering-aa0c91bb0eeb
+    # increases filesize 
+    def compress_image_V3(self,filename,output_destination):
+        from skimage import io
+        from sklearn.cluster import KMeans
+        import numpy as np
+
+        #Read the image
+        image = io.imread(filename)
+        io.imshow(image)
+        
+
+        #Dimension of the original image
+        rows = image.shape[0]
+        cols = image.shape[1]
+
+        #Flatten the image
+        image = image.reshape(rows*cols, 3)
+
+        #Implement k-means clustering to form k clusters
+        kmeans = KMeans(n_clusters=64)
+        kmeans.fit(image)
+
+        #Replace each pixel value with its nearby centroid
+        compressed_image = kmeans.cluster_centers_[kmeans.labels_]
+        compressed_image = np.clip(compressed_image.astype('uint8'), 0, 255)
+
+        #Reshape the image to original dimension
+        compressed_image = compressed_image.reshape(rows, cols, 3)
+        
+        #Save and display output image
+        io.imsave(output_destination, compressed_image)
+        io.imshow(compressed_image)
+        io.show()    
+        
+    # Source: https://raw.githubusercontent.com/code-blooded/Image-Compression/master/median-cut-algorithm/main.py
+    # distorts and increases filesize at depth 5
+    def compress_image_V4(self,filename,output_destination):
+        img = cv2.imread(filename)
+
+        #resized_image = cv2.resize(img, (256, 256))
+        #cv2.imwrite('code_blooded.bmp',resized_image)
+
+        img = np.array(img)
+        
+        rows,cols,channel = img.shape
+        img_b,img_g,img_r = cv2.split(img)
+        o_img_b,o_img_g,o_img_r = cv2.split(img)
+
+        depth = 3
+
+        nodes = pow(2,depth)
+        g_encode = median_cut(img_g,depth)
+        b_encode = median_cut(img_b,depth)
+        r_encode = median_cut(img_r,depth)
+
+        for i in range(rows):
+            for j in range(cols):
+                index = binarySearch(b_encode,0,nodes-1,img_b[i][j])
+                if(index!=-1):
+                    img_b[i][j] = int(b_encode[index]/2+b_encode[index+1]/2)
+                index = binarySearch(g_encode,0,nodes-1,img_g[i][j])
+                if(index!=-1):
+                    img_g[i][j] = int(g_encode[index]/2+g_encode[index+1]/2)
+                index = binarySearch(r_encode,0,nodes-1,img_r[i][j])
+                if(index!=-1):
+                    img_r[i][j] = int(r_encode[index]/2+r_encode[index+1]/2)
+
+        rgb = np.dstack((img_b,img_g,img_r))
+        cv2.imwrite(output_destination,rgb)
+        
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()        
+        
+    def compress_image_V5(self,filename,output_destination):            
+        # save image with lower quality—smaller file size
+        img = cv2.imread(filename)
+        cv2.imwrite(output_destination, img, [cv2.IMWRITE_JPEG_QUALITY, 90])
+    
+    #Source: https://pypi.org/project/optimize-images/
+    def compress_image_V6(self,filename,output_destination):            
+        os.system(f'cmd /k "optimize-images {filename}"')
+        
+        
+    # Source: https://stackoverflow.com/questions/25216382/gaussian-filter-in-scipy#25217058
+    # returns the truncation for a guassian image filter
+    def get_trunc(self,sigma,filter_size):
+        return (((filter_size - 1)/2)-0.5)/sigma
+        
+    def compress_image_V7(self,filename,output_destination):       
+        pixel_image = Image.open(filename)
+        sigma = 5
+        filter_size = 10
+        blurred = scipy.ndimage.filters.gaussian_filter(pixel_image, sigma=sigma, truncate=self.get_trunc(sigma,filter_size))
+        cv2.imwrite(output_destination, blurred)
+
 # executes this main code
 if __name__ == '__main__':
     main = ReadTemplate()
     
-    main.perform_runs()
+    #main.reduce_image_filesize('optimize/1.png','optimize/1_reducedV0.png')
+    #main.compress_image_V2('optimize/1.png','optimize/1_reducedV0.png')
+    #main.compress_image_V3('optimize/1.png','optimize/1_reducedV3.png')
+    #main.compress_image_V4('optimize/1.png','optimize/1_reducedV4.png')
+    #main.compress_image_V5('optimize/1.png','optimize/1_reducedV5.png')
+    # main.compress_image_V6('optimize/1.png','optimize/1_reducedV5.png') # works especially in jpg in png 8%
+    # main.compress_image_V7('optimize/1.png','optimize/1_reducedV5.png')
+    main.convert_png_to_jpg('optimize/1.png')
+    
+    #main.perform_runs()
