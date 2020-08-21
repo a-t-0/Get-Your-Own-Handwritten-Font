@@ -13,15 +13,25 @@ import subprocess
 # unzip miktexsetup-x64.zip
 # miktexsetup --verbose --local-package-repository=./tempfolder --package-set=complete download
 
+#https://miktex.org/faq/setup-cli
+#miktexsetup --package-set=basic download
+#miktexsetup install
+
 class InstallMiktex:
     
     # intializes object
     def __init__(self):
         self.miktex_portable_dir = "./miktex_portable"
         url = 'https://miktex.org/download/win/miktexsetup-x64.zip'
-        #wget.download(url) 
+        wget.download(url) 
         
-        
+        import os
+        current= os.path.dirname(os.path.abspath(__file__))
+        path_to_miktex= f'{current}/miktex_portable/miktexsetup.exe'
+        print(f'current={current}')
+        print(f'path_to_miktex={path_to_miktex}')
+        print(f'isfile={os.path.isfile(path_to_miktex)}')
+        os.system(f'cmd /k "{path_to_miktex}" install')
         
         
     # walks through zip files and calls function to unpack the zip file
@@ -52,6 +62,6 @@ class InstallMiktex:
 if __name__ == '__main__':
        
     main = InstallMiktex()
-    main.walk_through_zip_files("./")
-    main.make_miktex_portable_directory()
-    main.install_miktex_portable()
+    # main.walk_through_zip_files("./")
+    # main.make_miktex_portable_directory()
+    # main.install_miktex_portable()
