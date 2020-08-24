@@ -16,6 +16,7 @@ import subprocess
 # unzip miktexsetup-x64.zip
 # miktexsetup --verbose --local-package-repository=C:\temp\miktex --package-set=complete download
 
+# Performs the steps to convert your handwriting into a font, from start to finish.
 class MakeHandwrittenFont:
     
     # intializes object
@@ -42,12 +43,15 @@ class MakeHandwrittenFont:
         elif self.pdf_exists():
             print(f'You can print the pdf template now and fill it. But please check if it contains all the symbols you want it to contain since this was just the default pdf that was in the repository.')
 
+    # returns true if a file named main.pdf exists in subdir template_creating
     def pdf_exists(self):
         if os.path.isfile('./template_creating/main.pdf'):
             return True
         else:
             return False
 
+    # returns True if the a pdf is in the input folder.
+    # TODO: refactor to folder_has_filetype()
     def has_pdf_in_input(self):
         pdf_input_folder = './template_reading/in/'
         if self.folder_has_filetype(pdf_input_folder,'.pdf'):
@@ -55,6 +59,7 @@ class MakeHandwrittenFont:
         else:
             return False
             
+    # returns true if a certain file extension is in some folder
     def folder_has_filetype(self,folder,extension):
         for root, dirs, files in os.walk(folder):
             for file in files:
@@ -63,6 +68,8 @@ class MakeHandwrittenFont:
                     return True
         return False
 
+    # Counts the combined number of images of types png jpeg and jpg in the input folder
+    # and returns that number as integer
     def get_nr_of_input_images(self):
         input_folder = './template_reading/in/'
         extention_types = ['.png','.jpeg','.jpg']
@@ -70,7 +77,9 @@ class MakeHandwrittenFont:
         for i in range(0,len(extention_types)):
             count = count+self.count_folder_has_filetype(input_folder,extention_types[i])
         return count
-        
+    
+    # Returns integer of how often a file with given file extension occurs in a specific folder.
+    # subdirectories of the folder are excluded from the search.
     def count_folder_has_filetype(self,folder,extension):
         count = 0
         for root, dirs, files in os.walk(folder):
@@ -86,6 +95,7 @@ class MakeHandwrittenFont:
     # creates the font from the scanned pages
     def create_font(self):
         
+        # checks if the input folder contains a template
         if self.has_scanned_template():
             ReadTemplate()
         
@@ -110,6 +120,10 @@ class MakeHandwrittenFont:
             else:
                 raise Exception (f'Please upload more/better scanned images, not all symbols were detected in the scans you provided.')
     
+    # Checks whether the input has a pdf or at least as many images as there are pages in the template.
+    # Does NOT check if all pages in the template are present.
+    # TODO: Get the actual number of pages from the symbol_spec.txt file
+    # Asks user to supply at least as much images as there are pages in the template before proceding. pdf always proceeds to decoding qrcodes.
     def has_scanned_template(self):
         nr_pdf_pages = 3 # TODO: get actual nr of pages from compiled pdf or symbol spec
         nr_of_input_images = self.get_nr_of_input_images() 
@@ -120,18 +134,23 @@ class MakeHandwrittenFont:
         else:
             raise Exception (f'Please provide more scanned input images of your filled in template (or a pdf) in folder:template_reading/in to start creating your font. There were only {nr_of_input_images} images found.')
             
+    # Checks if all symbols are found by the decoder.
+    # TODO: implement
     def found_all_symbols(self):
         max_nr_of_symbols= 100 # TODO: read from symbol_spec.txt
         found_symbols = []
         return True
         
 
-
+    # Automatically compiles the pdf template that the users can print and fill in
+    # TODO: make it work on the automatically installed miktex
     def create_pdf(self, input_filename, output_filename):
         string = f'latex -output-format=pdf -job-name="{input_filename}" "{output_filename}" -enable-installer'
         process = subprocess.Popen([string])
         process.wait()        
 
+    # Second attempt to compile the the pdf template that the users can print and fill in
+    # TODO: make it work on the automatically installed miktex
     def create_pdfV1(self, input_filename, output_filename):
         import subprocess as Popen
         import subprocess as sp
@@ -140,7 +159,9 @@ class MakeHandwrittenFont:
         print(f'executing command={string}')
         
         os.system(f'cmd /k {string}')
-        
+
+    # Second attempt to compile the the pdf template that the users can print and fill in
+    # TODO: make it work on the automatically installed miktex            
     def create_pdfV2(self, input_filename, output_filename):
         process = subprocess.Popen([
             'latex',   # Or maybe 'C:\\Program Files\\MikTex\\miktex\\bin\\latex.exe
@@ -149,6 +170,8 @@ class MakeHandwrittenFont:
             input_filename,
             '-enable-installer'])
 
+    # Second attempt to compile the the pdf template that the users can print and fill in
+    # TODO: make it work on the automatically installed miktex
     def create_pdfV3(self, input_filename, output_filename):
         #pdflatex -output-format=pdf -job-name="template_creating/main.pdf" "template_creating/main.tex" -enable-installer
         #XeLaTex -output-format=pdf -job-name="template_creating/main.pdf" "template_creating/main.tex" -enable-installer
