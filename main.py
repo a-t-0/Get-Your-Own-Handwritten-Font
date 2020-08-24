@@ -25,6 +25,24 @@ class MakeHandwrittenFont:
         self.custom_symbols = custom_symbols
         self.has_miktex = has_miktex
         
+        ## Specifications that are outputed by the template creating module
+        self.nrOfSymbols = None
+        self.boxWidth = None
+        self.boxHeight = None
+        self.nrOfBoxesPerLine = None
+        self.nrOfBoxesPerLineMinOne = None
+        self.nrOfLinesInTemplate = None
+        self.nrOfLinesInTemplateMinOne = None
+        self.maxNrOfLinesPerPage = None
+        
+        ## hardcode script parameters
+        # relative qr specification file location
+        self.spec_filename = 'symbol_spec.txt'
+        self.spec_loc = f'template_creating/{self.spec_filename}'
+        
+        # read symbol specifications from symbol_spec.txt
+        self.read_image_specs()
+        
     # Compiles the pdf with the symbols
     def compile_pdf(self):
         # first output the font settings to a symbol_spec.txt file
@@ -42,6 +60,25 @@ class MakeHandwrittenFont:
             self.compile_pdf()
         elif self.pdf_exists():
             print(f'You can print the pdf template now and fill it. But please check if it contains all the symbols you want it to contain since this was just the default pdf that was in the repository.')
+
+    # read image specs from the specifications txt file
+    def read_image_specs(self):
+        file1 = open(self.spec_loc, 'r') 
+        Lines = file1.readlines() 
+        self.nrOfSymbols = self.rhs_val_of_eq(Lines[0])
+        self.boxWidth = self.rhs_val_of_eq(Lines[1])
+        self.boxHeight = self.rhs_val_of_eq(Lines[2])
+        self.nrOfBoxesPerLine = int(self.rhs_val_of_eq(Lines[3]))
+        self.nrOfBoxesPerLineMinOne = self.rhs_val_of_eq(Lines[4])
+        self.nrOfLinesInTemplate = int(self.rhs_val_of_eq(Lines[5]))
+        self.nrOfLinesInTemplateMinOne = self.rhs_val_of_eq(Lines[6])
+        self.maxNrOfLinesPerPage = int(self.rhs_val_of_eq(Lines[7]))
+    
+    # returns the integer value of the number on the rhs of the equation in the line
+    def rhs_val_of_eq(self, line):
+        start_index = line.find(' = ')
+        rhs = line[start_index:]
+        return ''.join(x for x in rhs if x.isdigit())
 
     # returns true if a file named main.pdf exists in subdir template_creating
     def pdf_exists(self):
@@ -81,16 +118,36 @@ class MakeHandwrittenFont:
     # Returns integer of how often a file with given file extension occurs in a specific folder.
     # subdirectories of the folder are excluded from the search.
     def count_folder_has_filetype(self,folder,extension):
-        count = 0
+        return len(self.get_filenames_in_folder(folder,extension))
+        
+    # Returns string of filename without dot without extension per file with given file extension occurs in a specific folder.
+    # subdirectories of the folder are excluded from the search.
+    def get_filenames_in_folder(self,folder,extension):
+        filenames = []
         for root, dirs, files in os.walk(folder):
             for file in files:
                 filepath = os.path.join(root, file)
                 if filepath[-len(extension):]==extension:
                     # only search specific folder and not subdirectories of folder
                     if not (('/' in filepath[len(folder):]) or ('\\' in filepath[len(folder):])):
-                        print(f'found file = {filepath} and count = {count}')
-                        count=count+1
-        return count
+                        filenames.append(self.get_filename_from_path(filepath,extension))
+        return filenames
+        
+    # returns the filename of a path without file extention        
+    def get_filename_from_path(self,path,extension):
+        
+        # remove file extension from file path
+        string = path[:-len(extension)]
+        
+        # find the last /,//,\\ or \ in the filepath (without the extension)
+        indices = [string[::-1].find('\\\\'),string[::-1].find('\\'),string[::-1].find('/'),string[::-1].find('//')]
+        
+        # return the end of the path without the extension back left towards the last(right to left) occurrence of the /,//,\\,\
+        min_pos_index = min(i for i in indices if i > 0)
+        
+        # return filename
+        return string[-min_pos_index:]    
+        
         
     # creates the font from the scanned pages
     def create_font(self):
@@ -98,7 +155,7 @@ class MakeHandwrittenFont:
         # checks if the input folder contains a template
         if self.has_scanned_template():
             ReadTemplate()
-        
+            
             if self.found_all_symbols():
         
                 # convert the font images to svg
@@ -118,7 +175,7 @@ class MakeHandwrittenFont:
                 # compile example latex to show font
                 # TODO
             else:
-                raise Exception (f'Please upload more/better scanned images, not all symbols were detected in the scans you provided.')
+                raise Exception (f'Please upload more/better scanned images, not all symbols were detected in the scans you provided.\n In particular the myssing symbol numbers are:{self.find_missing_symbols()}')
     
     # Checks whether the input has a pdf or at least as many images as there are pages in the template.
     # Does NOT check if all pages in the template are present.
@@ -133,13 +190,29 @@ class MakeHandwrittenFont:
             return True
         else:
             raise Exception (f'Please provide more scanned input images of your filled in template (or a pdf) in folder:template_reading/in to start creating your font. There were only {nr_of_input_images} images found.')
+
+    def find_missing_symbols(self):
+        found_symbols = []    
+        missing_symbols = []
+        
+        # Check which .png symbols are present in template_reading/in/
+        filenames = self.get_filenames_in_folder('./template_reading/font/','.png')
+        
+        # Check which .svg symbols are present in template_reading/in/
+        for i in range(1,int(self.nrOfSymbols)): # symbol indices start at 1.
+            print(f'{str(i)} is not in \n {filenames} is=\n{not str(i) in filenames}')
+            if not str(i) in filenames:
+                missing_symbols.append(i)
+        return missing_symbols
             
     # Checks if all symbols are found by the decoder.
     # TODO: implement
     def found_all_symbols(self):
-        max_nr_of_symbols= 100 # TODO: read from symbol_spec.txt
-        found_symbols = []
-        return True
+        if len(self.find_missing_symbols()) == 0:
+            return True
+        else:
+            print(f'missing_symbols={self.find_missing_symbols()}')
+            return False
         
 
     # Automatically compiles the pdf template that the users can print and fill in
@@ -190,7 +263,9 @@ class MakeHandwrittenFont:
             '-interaction nonstopmode']
         print(f'argList={argList}')
         process = subprocess.Popen(argList)                
-        
+    
+    
+  
 # executes this main code
 if __name__ == '__main__':
     
