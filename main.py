@@ -4,6 +4,8 @@ from font_creating.PngToSvg.convert_png_to_svg import ConvertPngToSvg
 from font_creating.convert_svg_to_grayscale import ConvertSvgToGrayscale
 from font_creating.CreateFont import CreateFont
 
+from shutil import copyfile
+import pickle
 import os
 # Source: https://anaconda.org/conda-forge/miktex
 #conda install -c conda-forge miktex
@@ -20,7 +22,7 @@ import subprocess
 class MakeHandwrittenFont:
     
     # intializes object
-    def __init__(self,language,custom_symbols,has_miktex):
+    def __init__(self,language,custom_symbols,has_miktex,fill_missing_png=False,fill_missing_svg=False,artificial_svgs=False,overwrite_existing_svgs=True):
         self.language = language
         self.custom_symbols = custom_symbols
         self.has_miktex = has_miktex
@@ -34,11 +36,24 @@ class MakeHandwrittenFont:
         self.nrOfLinesInTemplate = None
         self.nrOfLinesInTemplateMinOne = None
         self.maxNrOfLinesPerPage = None
+        self.fill_missing_png = fill_missing_png
+        self.fill_missing_svg = fill_missing_svg
+        self.artificial_svgs = artificial_svgs
+        self.overwrite_existing_svgs = overwrite_existing_svgs
+        self.substituted_pngs = None
         
         ## hardcode script parameters
         # relative qr specification file location
         self.spec_filename = 'symbol_spec.txt'
         self.spec_loc = f'template_creating/{self.spec_filename}'
+        
+        # Remove testfiles
+        self.test_handwritten_svg = 'template_reading/test_data/0.svg'
+        self.test_computer_svg = 'template_reading/test_data/small.svg'
+        self.test_handwritten_png = 'template_reading/test_data/0.png'
+        
+        self.remove_copied_test_files('.png')
+        self.remove_copied_test_files('.svg')
         
         # read symbol specifications from symbol_spec.txt
         self.read_image_specs()
@@ -109,10 +124,10 @@ class MakeHandwrittenFont:
     # and returns that number as integer
     def get_nr_of_input_images(self):
         input_folder = './template_reading/in/'
-        extention_types = ['.png','.jpeg','.jpg']
+        extension_types = ['.png','.jpeg','.jpg']
         count = 0
-        for i in range(0,len(extention_types)):
-            count = count+self.count_folder_has_filetype(input_folder,extention_types[i])
+        for i in range(0,len(extension_types)):
+            count = count+self.count_folder_has_filetype(input_folder,extension_types[i])
         return count
     
     # Returns integer of how often a file with given file extension occurs in a specific folder.
@@ -133,7 +148,7 @@ class MakeHandwrittenFont:
                         filenames.append(self.get_filename_from_path(filepath,extension))
         return filenames
         
-    # returns the filename of a path without file extention        
+    # returns the filename of a path without file extension        
     def get_filename_from_path(self,path,extension):
         
         # remove file extension from file path
@@ -155,27 +170,81 @@ class MakeHandwrittenFont:
         # checks if the input folder contains a template
         if self.has_scanned_template():
             ReadTemplate()
+            print(f'self.fill_missing_png={self.fill_missing_png}')
             
-            if self.found_all_symbols():
-        
+            if self.found_all_symbols('.png') or self.fill_missing_png:
+                # Check if the symbols should be suplemented for testing purposes.
+                if not self.found_all_symbols('.png'):
+                    print(f'suplementing the following missing files ={self.find_missing_symbols(".png")}')
+                    self.supplement_pngs_for_testing(self.test_handwritten_png,'.png')
+                
                 # convert the font images to svg
-                ConvertPngToSvg()        
+                ConvertPngToSvg('template_reading/font_in/',self.overwrite_existing_svgs)        
                 
-                # convert svg to grayscale
-                ConvertSvgToGrayscale('../template_reading/font_in/')
                 
-                # create json for font
-                # TODO 
-                
-                # create font
-                print(f'creating font')
-                CreateFont()
-                print(f'created font')
-                
+                # found the svg files                
+                if self.found_all_symbols('.svg') or self.fill_missing_svg:
+                    # Check if the symbols should be suplemented for testing purposes.
+                    if not self.found_all_symbols('.svg'):
+                        print(f'suplementing the following missing files ={self.find_missing_symbols(".svg")}')
+                        if self.artificial_svgs:
+                            print(f' substituting artificial svg from: {self.test_computer_svg}')
+                            self.supplement_pngs_for_testing(self.test_computer_svg,'.svg')
+                        else: 
+                            self.supplement_pngs_for_testing(self.test_handwritten_svg,'.svg')
+                    
+                    # convert svg to grayscale
+                    # TODO: change to font instead of font_in
+                    ConvertSvgToGrayscale('template_reading/font_in/')
+                        
+                    # create json for font
+                    # TODO 
+                    
+                    
+                    # create font
+                    print(f'creating font')
+                    #CreateFont()
+                    print(f'created font')
+                else:
+                    raise Exception (f'Not all png files were converted to svg files.\n In particular the missing symbol numbers are:{self.find_missing_symbols(".svg")}')
+            
                 # compile example latex to show font
                 # TODO
             else:
-                raise Exception (f'Please upload more/better scanned images, not all symbols were detected in the scans you provided.\n In particular the myssing symbol numbers are:{self.find_missing_symbols()}')
+                raise Exception (f'Please upload more/better scanned images, not all symbols were detected in the scans you provided.\n In particular the myssing symbol numbers are:{self.find_missing_symbols(".png")}')
+
+    # injects multiple png files for testing purposes
+    def supplement_pngs_for_testing(self,source_file,extension):
+        copied_test_pngs_pickle_path = 'template_reading/test_data/copied_pngs.pkl'
+        
+        missing_symbols = self.find_missing_symbols(extension)
+        # export list of copied files to test directory for removal upon next run.
+        with open(f'template_reading/test_data/copied_{extension[1:]}s.pkl', 'wb') as f:
+            pickle.dump(missing_symbols, f)
+        
+        # copy file 0.png from 'template_reading\test_data' to 'template_reading/font'
+        # rename file from 0.png to <i><extension>
+        for i in missing_symbols:
+            if os.path.exists(source_file):
+                copyfile(source_file, f'template_reading/font/{i}{extension}')
+            else:
+                raise Exception (f' could not find testfile in location:{source_file}')
+                
+    # removes injected test png files at start of run.
+    def remove_copied_test_files(self,extension):
+        copied_test_pngs_pickle_path = f'template_reading/test_data/copied_{extension[1:]}s.pkl'
+        if os.path.exists(copied_test_pngs_pickle_path):
+            with open(copied_test_pngs_pickle_path, 'rb') as f:
+                copied_test_pngs = pickle.load(f)
+                print(f'copied_test_pngs={copied_test_pngs}')
+                for i in copied_test_pngs:
+                    print(f' removing i={i}')
+                    if os.path.exists(f'template_reading/font/{i}{extension}'):
+                        os.remove(f'template_reading/font/{i}{extension}')
+            os.remove(copied_test_pngs_pickle_path)
+            
+                
+
     
     # Checks whether the input has a pdf or at least as many images as there are pages in the template.
     # Does NOT check if all pages in the template are present.
@@ -191,27 +260,27 @@ class MakeHandwrittenFont:
         else:
             raise Exception (f'Please provide more scanned input images of your filled in template (or a pdf) in folder:template_reading/in to start creating your font. There were only {nr_of_input_images} images found.')
 
-    def find_missing_symbols(self):
+    def find_missing_symbols(self,extension):
         found_symbols = []    
         missing_symbols = []
         
         # Check which .png symbols are present in template_reading/in/
-        filenames = self.get_filenames_in_folder('./template_reading/font/','.png')
+        filenames = self.get_filenames_in_folder('./template_reading/font/',extension)
         
         # Check which .svg symbols are present in template_reading/in/
         for i in range(1,int(self.nrOfSymbols)): # symbol indices start at 1.
-            print(f'{str(i)} is not in \n {filenames} is=\n{not str(i) in filenames}')
+            #print(f'{str(i)} is not in \n {filenames} is=\n{not str(i) in filenames}')
             if not str(i) in filenames:
                 missing_symbols.append(i)
         return missing_symbols
             
     # Checks if all symbols are found by the decoder.
     # TODO: implement
-    def found_all_symbols(self):
-        if len(self.find_missing_symbols()) == 0:
+    def found_all_symbols(self,extension):
+        if len(self.find_missing_symbols(extension)) == 0:
             return True
         else:
-            print(f'missing_symbols={self.find_missing_symbols()}')
+            print(f'missing_symbols={self.find_missing_symbols(extension)}')
             return False
         
 
@@ -268,13 +337,22 @@ class MakeHandwrittenFont:
   
 # executes this main code
 if __name__ == '__main__':
-    
+    import cv2
+    print(cv2.__version__)
+        
     # ask user which language the user wants to create
     language = "english"
     # ask user whether they created a custom set of symbols
     custom_symbols = False
     # ask if user has miktex installed already and can compile pdfs manually
     has_miktex = True
-    main = MakeHandwrittenFont(language,custom_symbols, has_miktex)
+    # Fills missing png (and/or svg) pictures for testing purposes
+    fill_missing_png = True
+    fill_missing_svg = True
+    artificial_svgs = True # uses svg of a letter designed in some font tool creator. Very small file of few kb/bytes
+    overwrite_existing_svgs = False # speeds up main process by skipping already created svgs
+    
+    main = MakeHandwrittenFont(language,custom_symbols, has_miktex,fill_missing_png,fill_missing_svg,artificial_svgs,overwrite_existing_svgs)
+                                
     main.compile_pdf()
     main.create_font()
