@@ -84,3 +84,29 @@ You can execute  `test.py` in Anaconda prompt in a python 3.6 environment with c
 python test.py
 ```
 It shouldn't output anything.
+
+
+
+
+### OpenGL installation Retry:
+(required for different git that does not create a font file but quickly shows/previews your font)
+Source: https://stackoverflow.com/questions/59725675/need-to-install-pyopengl-windows
+Download unofficial OpenGL from: https://www.lfd.uci.edu/~gohlke/pythonlibs/
+NOTE: If you use a python 3.6 envirionment, you need the `..cp36..` files, if you have a python 3.x environment, you need the `..cp3x..` files.
+
+1. If you have an AMD pc then download the following two files:
+PyOpenGL_accelerate-3.1.5-cp36-cp36m-win_amd64.whl
+PyOpenGL-3.1.5-cp36-cp36m-win_amd64.whl
+Otherwise download:
+PyOpenGL_accelerate-3.1.5-cp36-cp36m-win32.whl
+PyOpenGL-3.1.5-cp36-cp36m-win32.whl
+
+Next install them with commands:
+```
+pip install <downloaded file name>
+```
+For example:
+```
+pip install PyOpenGL_accelerate-3.1.5-cp36-cp36m-win32.whl
+pip install PyOpenGL-3.1.5-cp36-cp36m-win32.whl
+```
