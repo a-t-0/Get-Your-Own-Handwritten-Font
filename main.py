@@ -195,15 +195,15 @@ class MakeHandwrittenFont:
                     
                     # convert svg to grayscale
                     # TODO: change to font instead of font_in
-                    ConvertSvgToGrayscale('template_reading/font_in/')
+                    ConvertSvgToGrayscale('template_reading/font/')
                         
                     # create json for font
-                    # TODO 
+                    # TODO
                     
                     
                     # create font
                     print(f'creating font')
-                    #CreateFont()
+                    CreateFont()
                     print(f'created font')
                 else:
                     raise Exception (f'Not all png files were converted to svg files.\n In particular the missing symbol numbers are:{self.find_missing_symbols(".svg")}')
