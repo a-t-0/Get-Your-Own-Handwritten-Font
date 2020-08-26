@@ -5,10 +5,11 @@ from io import StringIO
 import os
 
 class ConvertPngToSvg():
-    def __init__(self):
+    def __init__(self,folder='../../template_reading/font_in/',overwrite_existing_svgs=False):
+        
         'examples/angular.png'
         # loop through files in font_in folder and convert them to .svg files
-        walk_through_png_files('../../template_reading/font_in/')
+        walk_through_png_files(folder,overwrite_existing_svgs)
 
 def add_tuple(a, b):
     return tuple(map(operator.add, a, b))
@@ -190,27 +191,36 @@ def rgba_image_to_svg_pixels(im, opaque=None):
     s.write("""</svg>\n""")
     return s.getvalue()
 
-def convert_png_to_svg(filepath):
-    image = Image.open(filepath).convert('RGBA')
-    svg_image = rgba_image_to_svg_contiguous(image)
-    #svg_image = rgba_image_to_svg_pixels(image)
-    with open(f'{filepath[:-4]}.svg', "w") as text_file:
-        text_file.write(svg_image)
-        print(f'Created svg file:{filepath[:-4]}.svg')
+def convert_png_to_svg(filepath,overwrite_existing_svgs):
+    output_svg_path = f'{filepath[:-4]}.svg'
+    print(f'DOes not exist ={not os.path.exists(output_svg_path)} with path = {output_svg_path} and overwrite_existing_svgs={overwrite_existing_svgs}')
+    
+    if overwrite_existing_svgs or (not os.path.exists(output_svg_path)):
+        print(f'creating svg={filepath}')
+        with open(f'{filepath[:-4]}.svg', "w") as text_file:
         
-        
+            image = Image.open(filepath).convert('RGBA')
+            svg_image = rgba_image_to_svg_contiguous(image)
+            #svg_image = rgba_image_to_svg_pixels(image)
+            text_file.write(svg_image)
+            print(f'Created svg file:{filepath[:-4]}.svg')        
+    
+    
 # walks through png files and calls function to convert the png file to .svg
-def walk_through_png_files(folder):
+def walk_through_png_files(folder,overwrite_existing_svgs):
     for root, dirs, files in os.walk(folder):
         for file in files:
             filepath = os.path.join(root, file)
-            #if filepath[-4:]==".png":
+            print(f'filepath={filepath}')
+            if filepath[-4:]==".png":
             #if filepath[-5:]=="0.png":
-            #   convert_png_to_svg(os.path.join(root, file))
-            if filepath[-5:]=="1.jpg":
-                print(f' converting')
-                convert_png_to_svg(os.path.join(root, file))
-                print(f' done converting')
+               print(f'converting {filepath} to svg')
+               convert_png_to_svg(os.path.join(root, file),overwrite_existing_svgs)
+               
+            # if filepath[-5:]=="1.jpg":
+                # print(f' converting')
+                # convert_png_to_svg(os.path.join(root, file))
+                # print(f' done converting')
 
 if __name__ == '__main__':
     main = ConvertPngToSvg()
