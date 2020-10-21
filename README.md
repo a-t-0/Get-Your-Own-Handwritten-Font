@@ -1,5 +1,7 @@
 # Fontmaker
-WIP: Makes your own font so you can create your own personal handwritten (latex) letters. Currently, the conversion from .svg's to fonts only works for a given set of `svg` files which have a small filesize. The computational time to create a font from svg's is too high for practical useage when including a customly created `.svg` file representing an actual written handwrittenletter. Hence the pngs and svgs need to be optimised further and/or the font creation algorithm should become more efficient. (See https://github.com/a-t-0/Get-Your-Own-Handwritten-Font/issues)
+WIP: Makes your own font so you can create your own personal handwritten (latex) letters.
+
+Warning: Currently, the conversion from .svg's to fonts only works for a given set of `svg` files which have a small filesize. The computational time to create a font from svg's is too large for practical useage when including a customly created `.svg` file representing an actual written handwrittenletter. Hence the pngs and svgs need to be optimised further and/or the font creation algorithm should become more efficient. (See https://github.com/a-t-0/Get-Your-Own-Handwritten-Font/issues)
 
 ## Usage Instructions
 0. Print the pdf page with the qr codes from `/template_creating/main.pdf`
